@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="description" content="實證醫學競賽現場發表用的五段配速計時器：PICO / Search / Appraisal / EtD / Apply，共 15 分鐘，段落時間到會響連續長音。">
+<meta name="description" content="實證醫學競賽現場發表用的五段配速計時器：PICO / Search / Appraisal / EtD / Apply，共 15 分鐘。可點選任一段單獨練習，段落時間到會響連續長音。">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#080B0E">
@@ -187,13 +187,25 @@ body{
 .cue--cut b{color:var(--flow-mid)}
 
 /* ── roster ── */
+.rosterhint{
+  font-family:var(--font-hud);font-size:11px;color:var(--ink-faint);
+  margin:0 0 -8px 2px;letter-spacing:.02em;
+}
 .roster{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px;
   border:1px solid var(--line);border-radius:3px;overflow:hidden;background:var(--line)}
 .row{
-  display:grid;grid-template-columns:96px 1fr 74px 92px;align-items:center;gap:12px;
+  display:grid;grid-template-columns:124px 1fr 74px 92px;align-items:center;gap:12px;
   padding:9px 14px;background:var(--panel-2);
 }
-.row[data-live="1"]{background:#16212B}
+.row{cursor:pointer;transition:background .14s,box-shadow .14s}
+.row:hover{background:#18242F}
+.row:focus-visible{outline:2px solid var(--flow-lo);outline-offset:-2px}
+.row[data-live="1"]{background:#16212B;box-shadow:inset 3px 0 0 var(--flow-lo)}
+.row__key{
+  font-family:var(--font-hud);font-size:10px;color:var(--ink-faint);
+  border:1px solid var(--line);border-radius:2px;padding:0 4px;margin-right:6px;
+}
+.row[data-live="1"] .row__key{color:var(--flow-lo);border-color:rgba(47,214,232,.45)}
 .row[data-done="1"] .row__name{color:var(--ink-dim)}
 .row__name{
   font-family:var(--font-label);font-size:13.5px;letter-spacing:.12em;text-transform:uppercase;
@@ -247,7 +259,7 @@ body{
 .card__note em{color:var(--ink);font-style:normal}
 
 @media (max-width:620px){
-  .row{grid-template-columns:78px 1fr 66px;gap:9px;padding:8px 11px}
+  .row{grid-template-columns:104px 1fr 70px;gap:9px;padding:10px 11px}
   .row__target{display:none}
   .console{padding:14px 12px 20px;gap:12px}
   .keys{display:none}
@@ -272,6 +284,7 @@ body{
     <div class="mission__head">
       <span class="eyebrow">總時長</span>
       <span class="mission__target" id="totalTarget">目標 15:00 · 官方分段</span>
+      <span class="pace" id="done5">已練 0 / 5 段</span>
       <span class="pace" id="pace" data-sign="even">累計 ±0:00</span>
       <span class="mission__clock" id="totalClock">12:00</span>
     </div>
@@ -306,6 +319,7 @@ body{
     <div class="cues" id="cues"></div>
   </section>
 
+  <p class="rosterhint">點任一段即可從那裡開始練 · 點目前這一段＝歸零重跑 · 鍵盤 1–5 同效</p>
   <ol class="roster" id="roster"></ol>
 
   <section class="card" id="card" aria-live="polite">
@@ -323,7 +337,7 @@ body{
     <button class="btn btn--next" id="next" disabled>下一段</button>
     <button class="btn" id="reset">重置</button>
     <span class="keys">
-      <kbd>Space</kbd> 下一段 · <kbd>S</kbd> 開始／暫停 · <kbd>R</kbd> 重置 · <kbd>M</kbd> 靜音
+      <kbd>1</kbd>–<kbd>5</kbd> 跳段 · <kbd>Space</kbd> 下一段 · <kbd>S</kbd> 開始／暫停 · <kbd>R</kbd> 重置 · <kbd>M</kbd> 靜音
     </span>
   </footer>
 
@@ -336,28 +350,15 @@ body{
   /* 官方 15 分鐘分段（秒）；練習模式等比縮到 12 分鐘 */
   var STAGES = [
     { key:"PICO",      slides:"Slide 01–09", official:60, cut:"開場與背景可壓縮，PICO 那張不能省",
-      cues:[["族群","清楚描述病人（族群）與疾病"],
-            ["介入","主要／其它介入、診斷或暴露因子"],
-            ["結果","正確指出結果的依據"]] },
+      cues:[["族群","清楚描述病人（族群）與疾病"],["介入","主要／其它介入、診斷或暴露因子"],["結果","正確指出結果的依據"]] },
     { key:"SEARCH",    slides:"Slide 10–31", official:150, cut:"操作截圖只翻不講，保住篩選歷程與決選",
-      cues:[["關鍵字","中文／free text／MeSH·Emtree"],
-            ["資料庫","選擇理由與相對應檢索策略"],
-            ["檢索","完整搜尋 ＋ 提升效率"],
-            ["篩選","歷程、納入與排除理由"]] },
+      cues:[["關鍵字","中文／free text／MeSH·Emtree"],["資料庫","選擇理由與相對應檢索策略"],["檢索","完整搜尋 ＋ 提升效率"],["篩選","歷程、納入與排除理由"]] },
     { key:"APPRAISAL", slides:"Slide 32–43", official:150, cut:"個別領域可略過，保住工具選擇與評讀結論",
-      cues:[["對象","正確描述所列文獻的族群與介入"],
-            ["工具","評讀工具要對應文獻類型"],
-            ["效度","validity"],
-            ["重要性","importance"]] },
+      cues:[["對象","正確描述所列文獻的族群與介入"],["工具","評讀工具要對應文獻類型"],["效度","validity"],["重要性","importance"]] },
     { key:"ETD",       slides:"Slide 44–62", official:270, cut:"次要 PICO 與細項可略，保住證據等級與臨床建議",
-      cues:[["等級","有系統的整合出證據等級"],
-            ["建議","以合理的方法形成臨床建議"],
-            ["品質","評估臨床建議的品質"]] },
+      cues:[["等級","有系統的整合出證據等級"],["建議","以合理的方法形成臨床建議"],["品質","評估臨床建議的品質"]] },
     { key:"APPLY",     slides:"Slide 63–76", official:270, cut:"照片與細節可壓縮，保住倫理考量與收尾結論",
-      cues:[["現況","分析現況問題"],
-            ["落差","指出知識與行動的落差"],
-            ["在地","轉化到當地情境且有倫理考量"],
-            ["推行","阻力助力、成本效益、時程"]] }
+      cues:[["現況","分析現況問題"],["落差","指出知識與行動的落差"],["在地","轉化到當地情境且有倫理考量"],["推行","阻力助力、成本效益、時程"]] }
   ];
 
   /* 官方分段，總長 15:00。這是唯一目標，不另設縮時版本。 */
@@ -400,9 +401,13 @@ body{
     return t;
   }
   /* 已完成段落的累計盈虧（負=領先） */
+  /* 只累計「真的講過」的段落；跳過沒練的段不能算成領先 */
   function paceDelta(){
     var T = targets(), d = 0;
-    for (var i=0;i<S.idx;i++) d += S.accStage[i] - T[i];
+    for (var i=0;i<STAGES.length;i++){
+      if (i === S.idx) continue;
+      if (S.accStage[i] > 0.4) d += S.accStage[i] - T[i];
+    }
     return d;
   }
 
@@ -488,9 +493,11 @@ body{
   function buildRoster(){
     var T = targets();
     el("roster").innerHTML = STAGES.map(function(s,i){
-      return '<li class="row" data-i="'+i+'">'
-        + '<div><span class="row__name">'+s.key+'</span><span class="row__slides">'+s.slides+'</span></div>'
-        + '<div class="bar" style="--h:9px" id="rb'+i+'"><div class="bar__fill" id="rf'+i+'" style="transform:scaleX(0)"></div><div class="bar__ticks"></div></div>'
+      return '<li class="row" data-i="'+i+'" role="button" tabindex="0" '
+        + 'aria-label="跳到 '+s.key+' 段（'+s.slides+'）">'
+        + '<div><span class="row__key">'+(i+1)+'</span><span class="row__name">'+s.key+'</span>'
+        + '<span class="row__slides">'+s.slides+'</span></div>'
+        + '<div class="bar" style="--h:9px" id="rb'+i+'"><div class="bar__fill" id="rf'+i+'" style="transform:scaleX(1)"></div><div class="bar__ticks"></div></div>'
         + '<div class="row__target">'+fmt(T[i])+'</div>'
         + '<div class="row__result" id="rr'+i+'">—</div>'
         + '</li>';
@@ -531,6 +538,10 @@ body{
     el("totalBar").dataset.state = stateFor(tRemain, tot);
     S.ghostTotal = Math.max(tFrac, S.ghostTotal - dt*0.10);
     el("totalGhost").style.transform = "scaleX("+S.ghostTotal+")";
+
+    var nDone = 0;
+    for (var q=0;q<STAGES.length;q++) if (S.accStage[q] > 0.4 || (q===S.idx && se > 0.4)) nDone++;
+    el("done5").textContent = "已練 " + nDone + " / 5 段";
 
     var pd = paceDelta();
     var pe = el("pace");
@@ -651,6 +662,34 @@ body{
     blip(784, .10);
   }
 
+  /* 點選段落：切到該段。點目前這一段＝把它歸零重跑。 */
+  function jumpTo(i){
+    if (i < 0 || i >= STAGES.length) return;
+    stopAll();
+    var same = (i === S.idx);
+    if (S.running) fold();
+    /* 離開的那一段若已經講過，就把成績鎖進列上 */
+    if (!same && S.accStage[S.idx] > 0.4) lockRow(S.idx);
+    if (same){                       /* 重跑本段 */
+      S.accStage[i] = 0;
+      el("rr"+i).textContent = "—";
+      el("rr"+i).dataset.sign = "even";
+    }
+    S.idx = i;
+    S.fired[i] = 0; S.nagAt = 0;
+    S.ghostStage = 1;
+    el("timeup").dataset.on = "0";
+    if (S.done){                     /* 收工後再點，等於重新開一輪 */
+      S.done = false;
+      el("card").dataset.show = "0";
+      el("go").disabled = false;
+    }
+    if (S.running){ S.spanStart = performance.now(); }
+    else { el("go").textContent = S.accStage[i] > 0 ? "繼續" : "開始"; el("go").classList.add("btn--go"); }
+    paintStage();
+    blip(988, .09);
+  }
+
   function finish(){
     fold(); S.running = false; S.done = true;
     el("go").disabled = true; el("next").disabled = true;
@@ -698,6 +737,14 @@ body{
   el("go").addEventListener("click", toggle);
   el("next").addEventListener("click", nextStage);
   el("reset").addEventListener("click", reset);
+  el("roster").addEventListener("click", function(e){
+    var row = e.target.closest(".row"); if (row) jumpTo(+row.dataset.i);
+  });
+  el("roster").addEventListener("keydown", function(e){
+    if (e.key !== "Enter" && e.key !== " ") return;
+    var row = e.target.closest(".row"); if (!row) return;
+    e.preventDefault(); e.stopPropagation(); jumpTo(+row.dataset.i);
+  });
   el("mute").addEventListener("click", function(){
     S.muted = !S.muted;
     if (S.muted) stopAll();
@@ -709,6 +756,7 @@ body{
     if (e.target.tagName === "BUTTON" && e.code === "Space") { e.preventDefault(); }
     if (e.code === "Space"){ e.preventDefault(); S.running ? nextStage() : toggle(); return; }
     var k = e.key.toLowerCase();
+    if (k >= "1" && k <= "5"){ e.preventDefault(); jumpTo(+k - 1); return; }
     if (k === "s"){ e.preventDefault(); toggle(); }
     if (k === "r"){ e.preventDefault(); reset(); }
     if (k === "m"){ e.preventDefault(); el("mute").click(); }
