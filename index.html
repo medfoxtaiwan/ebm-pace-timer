@@ -3,40 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
-<meta name="referrer" content="no-referrer">
+<meta name="description" content="實證醫學競賽現場發表用的五段配速計時器：PICO / Search / Appraisal / EtD / Apply，共 15 分鐘，段落時間到會響連續長音。">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#080B0E">
-<title>簡報配速台</title>
-<style>
-#gate{position:fixed;inset:0;z-index:99;background:#080B0E;display:flex;
-  flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px}
-#gate p{font-family:"PingFang TC",system-ui,sans-serif;color:#4A5866;font-size:14px;
-  letter-spacing:.14em;margin:0;text-transform:uppercase}
-#gate form{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-#pw{font-family:ui-monospace,Menlo,monospace;font-size:18px;letter-spacing:.28em;
-  background:#111820;border:1px solid #1E2A35;border-radius:2px;color:#DEE8F0;
-  padding:14px 16px;width:190px;text-align:center}
-#pw:focus{outline:2px solid #2FD6E8;outline-offset:2px}
-#gate button{font-family:"Avenir Next Condensed","Helvetica Neue",system-ui,sans-serif;
-  font-size:16px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
-  background:#2FD6E8;color:#04181C;border:0;border-radius:2px;padding:14px 26px;cursor:pointer;
-  min-height:48px}
-#gate button:focus-visible{outline:2px solid #DEE8F0;outline-offset:2px}
-#gate small{font-family:ui-monospace,Menlo,monospace;color:#FF4D3D;font-size:12px;min-height:16px}
-</style>
+<title>簡報配速台 · 實證醫學競賽 15 分鐘</title>
 </head>
 <body>
-<div id="gate">
-  <p>簡報配速台</p>
-  <form id="gf" autocomplete="off">
-    <input id="pw" type="password" inputmode="text" autocapitalize="none"
-           autocorrect="off" spellcheck="false" aria-label="通行碼">
-    <button type="submit">進入</button>
-  </form>
-  <small id="gm"></small>
-</div>
 
 <style>
 /* ── Duplex-ultrasound HUD ──────────────────────────────────────────────
@@ -290,7 +263,7 @@ body{
   <header class="top">
     <div class="brand">
       <b>簡報配速台</b>
-      <span>2026C3002 好頸不常隊 · NCMEA 實證菁英組 · 現場發表 15 分鐘</span>
+      <span>實證醫學競賽 · 現場發表 15 分鐘 · 五段配速</span>
     </div>
     <button class="icon-btn" id="mute" aria-pressed="false">♪ 音效 開</button>
   </header>
@@ -362,31 +335,29 @@ body{
 
   /* 官方 15 分鐘分段（秒）；練習模式等比縮到 12 分鐘 */
   var STAGES = [
-    { key:"PICO",      slides:"Slide 01–09", official:60, cut:"03 剩 2 秒、05 剩 4 秒 — 08 絕不能砍",
-      cues:[["04","「篩檢政策題，不是治療題」＋「過度診斷」"],
-            ["06","三個數字：盛行率 &lt;1% · 年風險 0.5–1% · 篩檢有傷害"],
-            ["08","P/I/C/O 四行 · O 刻意雙端 · 最貴的一張"]] },
-    { key:"SEARCH",    slides:"Slide 10–31", official:150, cut:"13–23 只翻不講（省 30 秒）",
-      cues:[["12","四庫各講一個不可取代的理由"],
-            ["24","152 → 142 → 42 → 3"],
-            ["27","全是間接證據 → 回頭再搜指引"],
-            ["31","決選：USPSTF 2021 Grade D"]] },
-    { key:"APPRAISAL", slides:"Slide 32–43", official:150, cut:"砍 38、39（省 13 秒）",
-      cues:[["34","工具跟文獻類型走 → AGREE II"],
-            ["37","D3 82%：危害大於效益 · 建議↔證據"],
-            ["42","6/7 可採用，唯一缺 D5 應用性 21%"],
-            ["43","PPV 約 13%：每 8 位陽性只 1 位是真的"]] },
-    { key:"ETD",       slides:"Slide 44–62", official:270, cut:"砍 46、48、60（省 20 秒），再不夠砍 53、57",
-      cues:[["45","承重牆：Core GRADE 允許間接證據"],
-            ["51","森林圖偏手術 — 主動 frame 三件事"],
-            ["52/54","Low ★★ vs Moderate ★★★"],
-            ["61","一般不篩 · 高風險納入風險評估"],
-            ["62","AGREE REX 回頭評自己的建議"]] },
-    { key:"APPLY",     slides:"Slide 63–76", official:270, cut:"68／71／74 各壓到 8 秒（省 30 秒）— 72、75 不可砍",
-      cues:[["66/67","19 位醫護 · 202 位民眾 · 落差在行銷"],
-            ["69/70","專家會議 → 再回證據，往返兩回"],
-            ["72","不禁止 · 前置風險評估 · SDM（倫理）"],
-            ["75","風險因子控制，勝於過度篩檢"]] }
+    { key:"PICO",      slides:"Slide 01–09", official:60, cut:"開場與背景可壓縮，PICO 那張不能省",
+      cues:[["族群","清楚描述病人（族群）與疾病"],
+            ["介入","主要／其它介入、診斷或暴露因子"],
+            ["結果","正確指出結果的依據"]] },
+    { key:"SEARCH",    slides:"Slide 10–31", official:150, cut:"操作截圖只翻不講，保住篩選歷程與決選",
+      cues:[["關鍵字","中文／free text／MeSH·Emtree"],
+            ["資料庫","選擇理由與相對應檢索策略"],
+            ["檢索","完整搜尋 ＋ 提升效率"],
+            ["篩選","歷程、納入與排除理由"]] },
+    { key:"APPRAISAL", slides:"Slide 32–43", official:150, cut:"個別領域可略過，保住工具選擇與評讀結論",
+      cues:[["對象","正確描述所列文獻的族群與介入"],
+            ["工具","評讀工具要對應文獻類型"],
+            ["效度","validity"],
+            ["重要性","importance"]] },
+    { key:"ETD",       slides:"Slide 44–62", official:270, cut:"次要 PICO 與細項可略，保住證據等級與臨床建議",
+      cues:[["等級","有系統的整合出證據等級"],
+            ["建議","以合理的方法形成臨床建議"],
+            ["品質","評估臨床建議的品質"]] },
+    { key:"APPLY",     slides:"Slide 63–76", official:270, cut:"照片與細節可壓縮，保住倫理考量與收尾結論",
+      cues:[["現況","分析現況問題"],
+            ["落差","指出知識與行動的落差"],
+            ["在地","轉化到當地情境且有倫理考量"],
+            ["推行","阻力助力、成本效益、時程"]] }
   ];
 
   /* 官方分段，總長 15:00。這是唯一目標，不另設縮時版本。 */
@@ -748,22 +719,5 @@ body{
 })();
 </script>
 
-<script>
-(function(){
-  /* 這道門只擋「隨手點開」，擋不住看原始碼的人。
-     真正的保護是這個網址猜不到 + noindex。 */
-  var CODE = "pjyaay";
-  var g = document.getElementById("gate");
-  function open_(){ g.remove(); try{ sessionStorage.setItem("pace_ok","1"); }catch(e){} }
-  try{ if (sessionStorage.getItem("pace_ok") === "1") open_(); }catch(e){}
-  var f = document.getElementById("gf");
-  if (f) f.addEventListener("submit", function(e){
-    e.preventDefault();
-    if (document.getElementById("pw").value.trim().toLowerCase() === CODE) open_();
-    else { document.getElementById("gm").textContent = "通行碼不對"; document.getElementById("pw").value = ""; }
-  });
-  var pw = document.getElementById("pw"); if (pw) pw.focus();
-})();
-</script>
 </body>
 </html>
