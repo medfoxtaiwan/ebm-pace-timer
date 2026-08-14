@@ -191,6 +191,9 @@ body{
   font-family:var(--font-hud);font-size:11px;color:var(--ink-faint);
   margin:0 0 -8px 2px;letter-spacing:.02em;
 }
+#mobhint{display:none;margin:6px 0 -8px 2px;line-height:1.6}
+#mobhint b{color:var(--flow-mid)}
+@media (max-width:760px){ #mobhint{display:block} }
 .roster{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px;
   border:1px solid var(--line);border-radius:3px;overflow:hidden;background:var(--line)}
 .row{
@@ -277,6 +280,7 @@ body{
       <b>簡報配速台</b>
       <span>實證醫學競賽 · 現場發表 15 分鐘 · 五段配速</span>
     </div>
+    <button class="icon-btn" id="test">♪ 測試鈴聲</button>
     <button class="icon-btn" id="mute" aria-pressed="false">♪ 音效 開</button>
   </header>
 
@@ -320,6 +324,7 @@ body{
   </section>
 
   <p class="rosterhint">點任一段即可從那裡開始練 · 點目前這一段＝歸零重跑 · 鍵盤 1–5 同效</p>
+  <p class="rosterhint" id="mobhint">手機沒聲音？先按一次「測試鈴聲」；仍沒聲請把側邊<b>靜音開關撥回響鈴</b>，並把音量調大。開始後會自動防止螢幕休眠。</p>
   <ol class="roster" id="roster"></ol>
 
   <section class="card" id="card" aria-live="polite">
@@ -437,6 +442,7 @@ body{
       });
     }catch(e){}
     live = [];
+    try{ if (toneEl){ toneEl.pause(); toneEl.currentTime = 0; } }catch(e){}
   }
   /* 短音：快起快落 */
   function voice(freq, dur, vol, type, at){
@@ -467,16 +473,100 @@ body{
     if (S.muted) return;
     try{ voice(freq, 0.09, vol, "square", 0); }catch(e){}
   }
-  /* 時間到：連續長音。基音＋純五度＋低八度，飽滿但不刺耳 */
-  function buzzer(dur){
-    if (S.muted) return;
+
+  /* ── 手機音效 ────────────────────────────────────────────────────
+     iOS Safari 的 WebAudio 走 ambient 通道，實體靜音鍵一撥就整個沒聲。
+     <audio> 元素走的是 media 通道，多數 iOS 版本不受靜音鍵影響，
+     所以「時間到」的長音改用執行時合成的 WAV，透過 <audio> 播。
+     另外 iOS 必須由使用者手勢解鎖，因此第一次觸控就先靜音預熱一次。 */
+  var toneEl = null;
+  function makeWav(freqs, amps, dur, sr){
+    sr = sr || 16000;
+    var n = Math.floor(sr * dur), buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    function txt(off, t){ for (var i=0;i<t.length;i++) v.setUint8(off+i, t.charCodeAt(i)); }
+    txt(0,"RIFF"); v.setUint32(4, 36+n*2, true); txt(8,"WAVEfmt ");
+    v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+    v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+    txt(36,"data"); v.setUint32(40, n*2, true);
+    var atk = 0.02*sr, rel = 0.25*sr;
+    for (var i=0;i<n;i++){
+      var t = i/sr, x = 0;
+      for (var k=0;k<freqs.length;k++) x += amps[k]*Math.sin(2*Math.PI*freqs[k]*t);
+      var env = 1;
+      if (i < atk) env = i/atk; else if (i > n-rel) env = (n-i)/rel;
+      x = Math.max(-1, Math.min(1, x*env*0.72));
+      v.setInt16(44+i*2, x*32767, true);
+    }
+    var b = new Uint8Array(buf), bin = "";
+    for (var j=0;j<b.length;j+=0x8000) bin += String.fromCharCode.apply(null, b.subarray(j, j+0x8000));
+    return "data:audio/wav;base64," + btoa(bin);
+  }
+  function initTone(){
+    if (toneEl) return toneEl;
     try{
-      stopAll();
-      dur = dur || 3.0;
+      toneEl = new Audio(makeWav([784,1176,392],[0.55,0.20,0.30], 3.4));
+      toneEl.preload = "auto";
+      toneEl.setAttribute("playsinline","");
+    }catch(e){ toneEl = null; }
+    return toneEl;
+  }
+  /* 第一次觸控／點擊：靜音播一次，把 iOS 的音訊權限拿到手 */
+  var primed = false;
+  function primeAudio(){
+    if (primed) return; primed = true;
+    try{ ctx(); }catch(e){}
+    var a = initTone(); if (!a) return;
+    try{
+      a.volume = 0;
+      var pr = a.play();
+      var done = function(){ try{ a.pause(); a.currentTime = 0; a.volume = 1; }catch(e){} };
+      if (pr && pr.then) pr.then(done).catch(function(){ a.volume = 1; }); else done();
+    }catch(e){ try{ a.volume = 1; }catch(e2){} }
+  }
+  document.addEventListener("pointerdown", primeAudio);
+  document.addEventListener("touchstart", primeAudio, {passive:true});
+  document.addEventListener("keydown", primeAudio);
+
+  /* 螢幕不要睡著 —— 睡著的話計時迴圈會停，鈴也不會響 */
+  var wakeLock = null;
+  function keepAwake(on){
+    try{
+      if (on){
+        if (!wakeLock && "wakeLock" in navigator){
+          navigator.wakeLock.request("screen").then(function(w){
+            wakeLock = w;
+            w.addEventListener("release", function(){ wakeLock = null; });
+          }).catch(function(){});
+        }
+      } else if (wakeLock){ wakeLock.release().catch(function(){}); wakeLock = null; }
+    }catch(e){}
+  }
+  document.addEventListener("visibilitychange", function(){
+    if (document.visibilityState === "visible"){
+      try{ if (actx && actx.state === "suspended") actx.resume(); }catch(e){}
+      if (S.running) keepAwake(true);
+    }
+  });
+  /* 時間到：連續長音。基音＋純五度＋低八度，飽滿但不刺耳 */
+  function webaudioBuzz(dur){
+    try{
       sustain(784,  dur, 0.20, "sine");
       sustain(1176, dur, 0.075, "sine");
       sustain(392,  dur, 0.11, "triangle");
     }catch(e){}
+  }
+  function buzzer(dur){
+    if (S.muted) return;
+    stopAll();
+    dur = dur || 3.0;
+    var a = initTone();
+    if (!a){ webaudioBuzz(dur); return; }
+    try{
+      a.pause(); a.currentTime = 0; a.volume = 1;
+      var pr = a.play();
+      if (pr && pr.catch) pr.catch(function(){ webaudioBuzz(dur); });   /* 被擋就退回 WebAudio */
+      if (dur < 3.3) setTimeout(function(){ try{ a.pause(); a.currentTime = 0; }catch(e){} }, dur*1000);
+    }catch(e){ webaudioBuzz(dur); }
   }
   function alarm(){
     if (S.muted) return;
@@ -641,13 +731,13 @@ body{
 
   function start(){
     if (S.done) return;
-    S.running = true; S.spanStart = performance.now();
+    S.running = true; S.spanStart = performance.now(); keepAwake(true);
     el("go").textContent = "暫停"; el("go").classList.remove("btn--go");
     el("next").disabled = false;
     blip(523, .09);
   }
   function pause(){
-    stopAll(); fold(); S.running = false;
+    stopAll(); fold(); S.running = false; keepAwake(false);
     el("go").textContent = "繼續"; el("go").classList.add("btn--go");
   }
   function toggle(){ if (S.done) return; S.running ? pause() : start(); }
@@ -691,7 +781,7 @@ body{
   }
 
   function finish(){
-    fold(); S.running = false; S.done = true;
+    fold(); S.running = false; S.done = true; keepAwake(false);
     el("go").disabled = true; el("next").disabled = true;
     el("console").dataset.alarm = "";
     document.querySelectorAll(".row").forEach(function(r){ r.dataset.live="0"; r.dataset.done="1"; });
@@ -719,7 +809,7 @@ body{
   }
 
   function reset(){
-    stopAll();
+    stopAll(); keepAwake(false);
     S.running = false; S.done = false; S.idx = 0;
     S.accStage = new Array(STAGES.length).fill(0);
     S.fired = new Array(STAGES.length).fill(0);
@@ -736,6 +826,12 @@ body{
   /* ── wiring ── */
   el("go").addEventListener("click", toggle);
   el("next").addEventListener("click", nextStage);
+  el("test").addEventListener("click", function(){
+    primeAudio();
+    var was = S.muted; S.muted = false;
+    buzzer(1.4);
+    setTimeout(function(){ S.muted = was; }, 1500);
+  });
   el("reset").addEventListener("click", reset);
   el("roster").addEventListener("click", function(e){
     var row = e.target.closest(".row"); if (row) jumpTo(+row.dataset.i);
