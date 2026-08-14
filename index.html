@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<meta name="referrer" content="no-referrer">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#080B0E">
+<title>簡報配速台</title>
+<style>
+#gate{position:fixed;inset:0;z-index:99;background:#080B0E;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px}
+#gate p{font-family:"PingFang TC",system-ui,sans-serif;color:#4A5866;font-size:14px;
+  letter-spacing:.14em;margin:0;text-transform:uppercase}
+#gate form{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+#pw{font-family:ui-monospace,Menlo,monospace;font-size:18px;letter-spacing:.28em;
+  background:#111820;border:1px solid #1E2A35;border-radius:2px;color:#DEE8F0;
+  padding:14px 16px;width:190px;text-align:center}
+#pw:focus{outline:2px solid #2FD6E8;outline-offset:2px}
+#gate button{font-family:"Avenir Next Condensed","Helvetica Neue",system-ui,sans-serif;
+  font-size:16px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  background:#2FD6E8;color:#04181C;border:0;border-radius:2px;padding:14px 26px;cursor:pointer;
+  min-height:48px}
+#gate button:focus-visible{outline:2px solid #DEE8F0;outline-offset:2px}
+#gate small{font-family:ui-monospace,Menlo,monospace;color:#FF4D3D;font-size:12px;min-height:16px}
+</style>
+</head>
+<body>
+<div id="gate">
+  <p>簡報配速台</p>
+  <form id="gf" autocomplete="off">
+    <input id="pw" type="password" inputmode="text" autocapitalize="none"
+           autocorrect="off" spellcheck="false" aria-label="通行碼">
+    <button type="submit">進入</button>
+  </form>
+  <small id="gm"></small>
+</div>
+
+<style>
+/* ── Duplex-ultrasound HUD ──────────────────────────────────────────────
+   單一視覺世界（刻意不做淺色主題）：B-mode 黑底 + 都卜勒速度色階。
+   低流速=青（安全）→ 琥珀 → 紅（高流速＝狹窄＝危險）。血條見底＝紅。   */
+
+:root{
+  --ground:#080B0E;
+  --panel:#111820;
+  --panel-2:#0D131A;
+  --line:#1E2A35;
+  --speckle:#18222C;
+
+  --flow-lo:#2FD6E8;   /* 安全 */
+  --flow-mid:#F2B13C;  /* 警戒 */
+  --flow-hi:#FF4D3D;   /* 臨界 */
+  --flow-over:#B3231A; /* 超時 */
+
+  --ink:#DEE8F0;
+  --ink-dim:#78899A;
+  --ink-faint:#4A5866;
+
+  --font-hud: ui-monospace,"SF Mono",Menlo,"Cascadia Mono","Roboto Mono",monospace;
+  --font-label:"Avenir Next Condensed","Helvetica Neue",'Arial Narrow',system-ui,sans-serif;
+  --font-body:"PingFang TC","Heiti TC","Microsoft JhengHei",system-ui,sans-serif;
+
+  color-scheme: dark;
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  background:
+    radial-gradient(115% 80% at 50% -10%, #101A24 0%, var(--ground) 62%),
+    var(--ground);
+  color:var(--ink);
+  font-family:var(--font-body);
+  -webkit-font-smoothing:antialiased;
+  min-height:100dvh;
+}
+
+/* 超時時整個畫面邊緣泛紅 */
+.console::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
+  box-shadow:inset 0 0 0 0 rgba(255,77,61,0);
+  transition:box-shadow .45s ease;
+}
+.console[data-alarm="crit"]::after{box-shadow:inset 0 0 90px 0 rgba(255,77,61,.22)}
+.console[data-alarm="over"]::after{
+  box-shadow:inset 0 0 130px 0 rgba(255,77,61,.42);
+  animation:vignette 1.15s ease-in-out infinite;
+}
+@keyframes vignette{50%{box-shadow:inset 0 0 60px 0 rgba(255,77,61,.16)}}
+
+.console{
+  max-width:1120px;margin:0 auto;padding:20px 18px 26px;
+  display:flex;flex-direction:column;gap:16px;min-height:100dvh;
+}
+
+/* ── header ── */
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;gap:2px;margin-right:auto}
+.brand b{
+  font-family:var(--font-label);font-size:15px;font-weight:600;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--ink)
+}
+.brand span{font-size:11.5px;color:var(--ink-faint);letter-spacing:.04em}
+
+.seg{display:flex;border:1px solid var(--line);border-radius:2px;overflow:hidden}
+.seg button{
+  font-family:var(--font-hud);font-size:11.5px;letter-spacing:.08em;
+  background:transparent;color:var(--ink-dim);border:0;padding:7px 13px;cursor:pointer;
+}
+.seg button[aria-pressed="true"]{background:var(--flow-lo);color:#04181C;font-weight:700}
+.seg button:focus-visible{outline:2px solid var(--flow-lo);outline-offset:-2px}
+
+.icon-btn{
+  font-family:var(--font-hud);font-size:11.5px;letter-spacing:.08em;
+  background:transparent;color:var(--ink-dim);border:1px solid var(--line);
+  border-radius:2px;padding:7px 11px;cursor:pointer;
+}
+.icon-btn:hover{color:var(--ink);border-color:var(--ink-faint)}
+.icon-btn:focus-visible{outline:2px solid var(--flow-lo);outline-offset:2px}
+
+/* ── shared bar ── */
+.bar{
+  position:relative;height:var(--h,14px);background:var(--speckle);
+  border:1px solid var(--line);border-radius:1px;overflow:hidden;
+}
+.bar__ghost,.bar__fill{position:absolute;inset:0;transform-origin:left center;will-change:transform}
+.bar__ghost{background:rgba(255,255,255,.24)}
+.bar__fill{background:var(--flow-lo);transition:background-color .3s ease}
+.bar[data-state="warn"] .bar__fill{background:var(--flow-mid)}
+.bar[data-state="crit"] .bar__fill{background:var(--flow-hi)}
+.bar[data-state="crit"] .bar__fill{animation:throb .62s ease-in-out infinite}
+.bar[data-state="over"] .bar__fill{background:var(--flow-over)}
+@keyframes throb{50%{opacity:.45}}
+.bar__ticks{
+  position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(90deg,transparent 0 calc(2.5% - 1px),rgba(8,11,14,.55) calc(2.5% - 1px) 2.5%);
+}
+.bar__marks{position:absolute;inset:0;pointer-events:none}
+.bar__marks i{position:absolute;top:0;bottom:0;width:1px;background:rgba(222,232,240,.42)}
+
+/* ── mission ── */
+.mission{
+  background:linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%);
+  border:1px solid var(--line);border-radius:3px;padding:14px 16px 15px;
+  display:flex;flex-direction:column;gap:9px;
+}
+.mission__head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.eyebrow{
+  font-family:var(--font-label);font-size:11px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--ink-faint);
+}
+.mission__clock{
+  font-family:var(--font-hud);font-variant-numeric:tabular-nums;
+  font-size:clamp(30px,6.4vw,46px);line-height:1;letter-spacing:-.02em;margin-left:auto;
+}
+.mission__target{font-family:var(--font-hud);font-size:12px;color:var(--ink-faint)}
+.pace{
+  font-family:var(--font-hud);font-variant-numeric:tabular-nums;font-size:12.5px;
+  padding:3px 8px;border:1px solid var(--line);border-radius:2px;color:var(--ink-dim);
+}
+.pace[data-sign="ahead"]{color:var(--flow-lo);border-color:rgba(47,214,232,.4)}
+.pace[data-sign="behind"]{color:var(--flow-hi);border-color:rgba(255,77,61,.45)}
+
+/* ── active stage ── */
+.active{
+  background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--flow-lo);
+  border-radius:3px;padding:16px 18px 18px;display:flex;flex-direction:column;gap:12px;
+  transition:border-left-color .3s ease;
+}
+.active[data-state="warn"]{border-left-color:var(--flow-mid)}
+.active[data-state="crit"]{border-left-color:var(--flow-hi)}
+.active[data-state="over"]{border-left-color:var(--flow-over)}
+
+.active__head{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+.active__name{
+  font-family:var(--font-label);font-size:clamp(26px,5vw,38px);font-weight:600;
+  letter-spacing:.06em;text-transform:uppercase;line-height:.95;
+}
+.active__slides{font-family:var(--font-hud);font-size:12px;color:var(--ink-faint);padding-bottom:4px}
+.active__clock{
+  margin-left:auto;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:1px;
+}
+.active__remain{
+  font-family:var(--font-hud);font-variant-numeric:tabular-nums;
+  font-size:clamp(34px,7.4vw,54px);line-height:.92;letter-spacing:-.03em;
+}
+.active[data-state="crit"] .active__remain{color:var(--flow-hi)}
+.active[data-state="over"] .active__remain{color:var(--flow-hi)}
+.active__used{font-family:var(--font-hud);font-size:11.5px;color:var(--ink-faint)}
+
+.timeup{
+  display:none;align-items:center;gap:8px;
+  font-family:var(--font-label);font-size:15px;letter-spacing:.1em;font-weight:600;
+  background:rgba(255,77,61,.13);border:1px solid rgba(255,77,61,.5);
+  color:#FF7A6D;border-radius:2px;padding:9px 13px;
+}
+.timeup[data-on="1"]{display:flex;animation:tuPulse 1.05s ease-in-out infinite}
+.timeup__b{font-size:17px}
+@keyframes tuPulse{50%{background:rgba(255,77,61,.28);border-color:rgba(255,77,61,.85)}}
+
+.cues{display:flex;flex-wrap:wrap;gap:6px}
+.cue{
+  font-size:12px;line-height:1.35;color:var(--ink-dim);
+  border:1px solid var(--line);border-radius:2px;padding:4px 9px;background:var(--panel-2);
+}
+.cue b{color:var(--flow-lo);font-weight:600}
+.cue--cut{border-color:rgba(242,177,60,.42);background:rgba(242,177,60,.07);color:#D9A75C;
+  opacity:0;transition:opacity .45s ease}
+.cues[data-panic="1"] .cue--cut{opacity:1}
+.cue--cut b{color:var(--flow-mid)}
+
+/* ── roster ── */
+.roster{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px;
+  border:1px solid var(--line);border-radius:3px;overflow:hidden;background:var(--line)}
+.row{
+  display:grid;grid-template-columns:96px 1fr 74px 92px;align-items:center;gap:12px;
+  padding:9px 14px;background:var(--panel-2);
+}
+.row[data-live="1"]{background:#16212B}
+.row[data-done="1"] .row__name{color:var(--ink-dim)}
+.row__name{
+  font-family:var(--font-label);font-size:13.5px;letter-spacing:.12em;text-transform:uppercase;
+}
+.row__slides{font-family:var(--font-hud);font-size:10px;color:var(--ink-faint);display:block;letter-spacing:0}
+.row__target,.row__result{
+  font-family:var(--font-hud);font-variant-numeric:tabular-nums;font-size:12px;text-align:right;
+}
+.row__target{color:var(--ink-faint)}
+.row__result{color:var(--ink-dim)}
+.row__result[data-sign="ahead"]{color:var(--flow-lo)}
+.row__result[data-sign="behind"]{color:var(--flow-hi)}
+
+/* ── controls ── */
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:auto;padding-top:4px}
+.btn{
+  font-family:var(--font-label);font-size:15px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  border:1px solid var(--line);background:var(--panel);color:var(--ink);
+  border-radius:2px;padding:12px 22px;cursor:pointer;transition:background .15s,border-color .15s;
+}
+.btn:hover{border-color:var(--ink-faint)}
+.btn:focus-visible{outline:2px solid var(--flow-lo);outline-offset:2px}
+.btn--go{background:var(--flow-lo);border-color:var(--flow-lo);color:#04181C}
+.btn--go:hover{background:#54E2F1;border-color:#54E2F1}
+.btn--next{background:var(--panel);border-color:var(--flow-lo);color:var(--flow-lo)}
+.btn--next:hover{background:rgba(47,214,232,.1)}
+.btn[disabled]{opacity:.32;cursor:not-allowed}
+.keys{font-family:var(--font-hud);font-size:11px;color:var(--ink-faint);margin-left:auto;letter-spacing:.02em}
+.keys kbd{
+  font-family:var(--font-hud);border:1px solid var(--line);border-bottom-width:2px;
+  border-radius:2px;padding:1px 5px;color:var(--ink-dim);margin:0 1px;
+}
+
+/* ── scorecard ── */
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:15px 17px;
+  display:none;flex-direction:column;gap:10px;
+}
+.card[data-show="1"]{display:flex}
+.card__grand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.card__grand b{
+  font-family:var(--font-hud);font-variant-numeric:tabular-nums;font-size:30px;font-weight:400;line-height:1;
+}
+.verdict{
+  font-family:var(--font-label);font-size:13px;letter-spacing:.16em;text-transform:uppercase;
+  padding:4px 10px;border-radius:2px;
+}
+.verdict[data-v="pass"]{background:rgba(47,214,232,.14);color:var(--flow-lo);border:1px solid rgba(47,214,232,.4)}
+.verdict[data-v="fail"]{background:rgba(255,77,61,.13);color:var(--flow-hi);border:1px solid rgba(255,77,61,.42)}
+.card__note{font-size:12.5px;line-height:1.6;color:var(--ink-dim)}
+.card__note em{color:var(--ink);font-style:normal}
+
+@media (max-width:620px){
+  .row{grid-template-columns:78px 1fr 66px;gap:9px;padding:8px 11px}
+  .row__target{display:none}
+  .console{padding:14px 12px 20px;gap:12px}
+  .keys{display:none}
+  .btn{flex:1;padding:14px 12px;font-size:14px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important}
+}
+</style>
+
+<div class="console" id="console">
+
+  <header class="top">
+    <div class="brand">
+      <b>簡報配速台</b>
+      <span>2026C3002 好頸不常隊 · NCMEA 實證菁英組 · 現場發表 15 分鐘</span>
+    </div>
+    <button class="icon-btn" id="mute" aria-pressed="false">♪ 音效 開</button>
+  </header>
+
+  <section class="mission" aria-label="總時間">
+    <div class="mission__head">
+      <span class="eyebrow">總時長</span>
+      <span class="mission__target" id="totalTarget">目標 15:00 · 官方分段</span>
+      <span class="pace" id="pace" data-sign="even">累計 ±0:00</span>
+      <span class="mission__clock" id="totalClock">12:00</span>
+    </div>
+    <div class="bar" style="--h:16px" id="totalBar">
+      <div class="bar__ghost" id="totalGhost"></div>
+      <div class="bar__fill" id="totalFill"></div>
+      <div class="bar__ticks"></div>
+      <div class="bar__marks" id="totalMarks"></div>
+    </div>
+  </section>
+
+  <section class="active" id="active" aria-live="polite">
+    <div class="active__head">
+      <div>
+        <div class="eyebrow" id="stageIdx">段落 1 / 5</div>
+        <div class="active__name" id="stageName">PICO</div>
+      </div>
+      <div class="active__slides" id="stageSlides">Slide 01–09</div>
+      <div class="active__clock">
+        <div class="active__remain" id="stageClock">0:48</div>
+        <div class="active__used" id="stageUsed">0:00 / 0:48</div>
+      </div>
+    </div>
+    <div class="bar" style="--h:22px" id="stageBar">
+      <div class="bar__ghost" id="stageGhost"></div>
+      <div class="bar__fill" id="stageFill"></div>
+      <div class="bar__ticks"></div>
+    </div>
+    <div class="timeup" id="timeup" data-on="0" role="status">
+      <span class="timeup__b">⏰</span> 本段時間到 · 已超出 <span id="timeupAmt">+0:00</span> · 按「下一段」即可止音
+    </div>
+    <div class="cues" id="cues"></div>
+  </section>
+
+  <ol class="roster" id="roster"></ol>
+
+  <section class="card" id="card" aria-live="polite">
+    <div class="card__grand">
+      <span class="eyebrow">收工</span>
+      <b id="cardTotal">—</b>
+      <span class="verdict" id="cardVerdict" data-v="pass">達標</span>
+      <span class="mission__target" id="cardDelta"></span>
+    </div>
+    <p class="card__note" id="cardNote"></p>
+  </section>
+
+  <footer class="controls">
+    <button class="btn btn--go" id="go">開始</button>
+    <button class="btn btn--next" id="next" disabled>下一段</button>
+    <button class="btn" id="reset">重置</button>
+    <span class="keys">
+      <kbd>Space</kbd> 下一段 · <kbd>S</kbd> 開始／暫停 · <kbd>R</kbd> 重置 · <kbd>M</kbd> 靜音
+    </span>
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* 官方 15 分鐘分段（秒）；練習模式等比縮到 12 分鐘 */
+  var STAGES = [
+    { key:"PICO",      slides:"Slide 01–09", official:60, cut:"03 剩 2 秒、05 剩 4 秒 — 08 絕不能砍",
+      cues:[["04","「篩檢政策題，不是治療題」＋「過度診斷」"],
+            ["06","三個數字：盛行率 &lt;1% · 年風險 0.5–1% · 篩檢有傷害"],
+            ["08","P/I/C/O 四行 · O 刻意雙端 · 最貴的一張"]] },
+    { key:"SEARCH",    slides:"Slide 10–31", official:150, cut:"13–23 只翻不講（省 30 秒）",
+      cues:[["12","四庫各講一個不可取代的理由"],
+            ["24","152 → 142 → 42 → 3"],
+            ["27","全是間接證據 → 回頭再搜指引"],
+            ["31","決選：USPSTF 2021 Grade D"]] },
+    { key:"APPRAISAL", slides:"Slide 32–43", official:150, cut:"砍 38、39（省 13 秒）",
+      cues:[["34","工具跟文獻類型走 → AGREE II"],
+            ["37","D3 82%：危害大於效益 · 建議↔證據"],
+            ["42","6/7 可採用，唯一缺 D5 應用性 21%"],
+            ["43","PPV 約 13%：每 8 位陽性只 1 位是真的"]] },
+    { key:"ETD",       slides:"Slide 44–62", official:270, cut:"砍 46、48、60（省 20 秒），再不夠砍 53、57",
+      cues:[["45","承重牆：Core GRADE 允許間接證據"],
+            ["51","森林圖偏手術 — 主動 frame 三件事"],
+            ["52/54","Low ★★ vs Moderate ★★★"],
+            ["61","一般不篩 · 高風險納入風險評估"],
+            ["62","AGREE REX 回頭評自己的建議"]] },
+    { key:"APPLY",     slides:"Slide 63–76", official:270, cut:"68／71／74 各壓到 8 秒（省 30 秒）— 72、75 不可砍",
+      cues:[["66/67","19 位醫護 · 202 位民眾 · 落差在行銷"],
+            ["69/70","專家會議 → 再回證據，往返兩回"],
+            ["72","不禁止 · 前置風險評估 · SDM（倫理）"],
+            ["75","風險因子控制，勝於過度篩檢"]] }
+  ];
+
+  /* 官方分段，總長 15:00。這是唯一目標，不另設縮時版本。 */
+  var TARGET = { total:900, label:"15:00", secs:[60, 150, 150, 270, 270] };
+
+  var el = function(id){ return document.getElementById(id); };
+  var S = {
+    running:false, done:false,
+    idx:0, spanStart:0,
+    accStage:new Array(STAGES.length).fill(0),
+    ghostStage:0, ghostTotal:0,
+    fired:new Array(STAGES.length).fill(0),
+    nagAt:0, totalRung:false,
+    muted:false
+  };
+
+  function targets(){ return TARGET.secs.slice(); }
+  function totalTarget(){ return TARGET.total; }
+
+  function fmt(sec){
+    var neg = sec < 0; sec = Math.abs(Math.floor(sec));
+    var m = Math.floor(sec/60), s = sec%60;
+    return (neg?"−":"") + m + ":" + (s<10?"0":"") + s;
+  }
+  function signed(sec){
+    var r = Math.round(sec);
+    if (r === 0) return "±0:00";
+    return (r>0?"+":"−") + fmt(Math.abs(r));
+  }
+
+  /* 目前這一段已用秒數（含正在跑的這一小段） */
+  function stageElapsed(i){
+    var v = S.accStage[i];
+    if (S.running && i === S.idx) v += (performance.now() - S.spanStart)/1000;
+    return v;
+  }
+  function totalElapsed(){
+    var t = 0;
+    for (var i=0;i<STAGES.length;i++) t += (i===S.idx ? stageElapsed(i) : S.accStage[i]);
+    return t;
+  }
+  /* 已完成段落的累計盈虧（負=領先） */
+  function paceDelta(){
+    var T = targets(), d = 0;
+    for (var i=0;i<S.idx;i++) d += S.accStage[i] - T[i];
+    return d;
+  }
+
+  /* ── audio ─────────────────────────────────────────────────────────
+     三種聲音，刻意做得能分辨：
+       blip   方波短音        — 剩 30 秒／剩 10 秒的預告
+       buzzer 持續長音（3 秒） — 本段時間到；超時期間每 10 秒再補一次短版
+       alarm  下行三連        — 總時長 15:00 到
+     持續音會一直響到你按「下一段」為止（stopAll）。
+     ------------------------------------------------------------------ */
+  var actx = null, live = [];
+  function ctx(){
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+    return actx;
+  }
+  function stopAll(){
+    try{
+      var a = ctx(), t = a.currentTime;
+      live.forEach(function(v){
+        try{
+          v.g.gain.cancelScheduledValues(t);
+          v.g.gain.setValueAtTime(Math.max(v.g.gain.value, 0.0001), t);
+          v.g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+          v.o.stop(t + 0.10);
+        }catch(e){}
+      });
+    }catch(e){}
+    live = [];
+  }
+  /* 短音：快起快落 */
+  function voice(freq, dur, vol, type, at){
+    var a = ctx(), t = a.currentTime + (at || 0);
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = type || "sine"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(t); o.stop(t + dur + 0.03);
+    live.push({o:o, g:g});
+  }
+  /* 持續音：起音 → 維持整段 → 收尾淡出（不是會衰減的鐘聲） */
+  function sustain(freq, dur, vol, type){
+    var a = ctx(), t = a.currentTime;
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = type || "sine"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.025);           // 起音
+    g.gain.setValueAtTime(vol, t + Math.max(0.1, dur - 0.30));     // 全程維持
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);          // 收尾
+    o.connect(g); g.connect(a.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+    live.push({o:o, g:g});
+  }
+  function blip(freq, vol){
+    if (S.muted) return;
+    try{ voice(freq, 0.09, vol, "square", 0); }catch(e){}
+  }
+  /* 時間到：連續長音。基音＋純五度＋低八度，飽滿但不刺耳 */
+  function buzzer(dur){
+    if (S.muted) return;
+    try{
+      stopAll();
+      dur = dur || 3.0;
+      sustain(784,  dur, 0.20, "sine");
+      sustain(1176, dur, 0.075, "sine");
+      sustain(392,  dur, 0.11, "triangle");
+    }catch(e){}
+  }
+  function alarm(){
+    if (S.muted) return;
+    try{
+      stopAll();
+      voice(1046, 0.30, 0.22, "square", 0.00);
+      voice(880,  0.30, 0.22, "square", 0.26);
+      sustain(659, 2.60, 0.22, "square");
+      sustain(330, 2.60, 0.14, "sine");
+    }catch(e){}
+  }
+
+  /* ── roster ── */
+  function buildRoster(){
+    var T = targets();
+    el("roster").innerHTML = STAGES.map(function(s,i){
+      return '<li class="row" data-i="'+i+'">'
+        + '<div><span class="row__name">'+s.key+'</span><span class="row__slides">'+s.slides+'</span></div>'
+        + '<div class="bar" style="--h:9px" id="rb'+i+'"><div class="bar__fill" id="rf'+i+'" style="transform:scaleX(0)"></div><div class="bar__ticks"></div></div>'
+        + '<div class="row__target">'+fmt(T[i])+'</div>'
+        + '<div class="row__result" id="rr'+i+'">—</div>'
+        + '</li>';
+    }).join("");
+  }
+
+  /* 血條由右往左退，所以段落關卡要標在 1 − 累計/總長 的位置：
+     條子退過一道刻痕 = 你剛好用完那一段的預算。 */
+  function buildMarks(){
+    var T = targets(), tot = totalTarget(), acc = 0, html = "";
+    for (var i=0;i<T.length-1;i++){
+      acc += T[i];
+      html += '<i style="left:'+((1 - acc/tot)*100).toFixed(3)+'%"></i>';
+    }
+    el("totalMarks").innerHTML = html;
+  }
+
+  function stateFor(remain, target){
+    if (remain <= 0) return "over";
+    var f = remain/target;
+    if (f <= 0.12) return "crit";
+    if (f <= 0.34) return "warn";
+    return "ok";
+  }
+
+  /* ── render ── */
+  var last = performance.now();
+  function render(now){
+    var dt = Math.min((now - last)/1000, 0.1); last = now;
+    var T = targets(), tot = totalTarget();
+
+    /* 總計 */
+    var te = totalElapsed(), tRemain = tot - te;
+    el("totalClock").textContent = (tRemain < 0 ? "+" : "") + fmt(Math.abs(tRemain));
+    el("totalClock").style.color = tRemain < 0 ? "var(--flow-hi)" : "";
+    var tFrac = Math.max(0, Math.min(1, tRemain/tot));
+    el("totalFill").style.transform = "scaleX("+tFrac+")";
+    el("totalBar").dataset.state = stateFor(tRemain, tot);
+    S.ghostTotal = Math.max(tFrac, S.ghostTotal - dt*0.10);
+    el("totalGhost").style.transform = "scaleX("+S.ghostTotal+")";
+
+    var pd = paceDelta();
+    var pe = el("pace");
+    pe.textContent = "累計 " + signed(pd);
+    pe.dataset.sign = Math.abs(pd) < 1.5 ? "even" : (pd < 0 ? "ahead" : "behind");
+
+    /* 當前段 */
+    var i = Math.min(S.idx, STAGES.length-1);
+    var se = stageElapsed(i), st = T[i], sRemain = st - se;
+    el("stageClock").textContent = (sRemain < 0 ? "+" : "") + fmt(Math.abs(sRemain));
+    el("stageUsed").textContent = fmt(se) + " / " + fmt(st);
+    var sFrac = Math.max(0, Math.min(1, sRemain/st));
+    el("stageFill").style.transform = "scaleX("+sFrac+")";
+    var st8 = stateFor(sRemain, st);
+    el("stageBar").dataset.state = st8;
+    el("active").dataset.state = st8;
+    S.ghostStage = Math.max(sFrac, S.ghostStage - dt*0.22);
+    el("stageGhost").style.transform = "scaleX("+S.ghostStage+")";
+
+    el("console").dataset.alarm = S.done ? "" : (st8 === "over" ? "over" : (st8 === "crit" ? "crit" : ""));
+    /* 血條轉黃之後，逃生閥才浮現 */
+    el("cues").dataset.panic = (!S.done && st8 !== "ok") ? "1" : "0";
+
+    /* 提示鈴 */
+    if (S.running && !S.done){
+      var f = S.fired[i];
+      if (st >= 60 && sRemain <= 30 && f < 1){
+        S.fired[i] = 1; blip(660, .10);
+      }
+      if (sRemain <= 10 && f < 2){
+        S.fired[i] = 2; blip(880, .13); setTimeout(function(){ blip(880, .13); }, 160);
+      }
+      if (sRemain <= 0 && f < 3){                 /* 本段時間到 */
+        S.fired[i] = 3; S.nagAt = now; buzzer(3.0);      /* 連續長音 */
+      }
+      if (sRemain <= 0 && f >= 3 && now - S.nagAt >= 10000){   /* 超時：每 10 秒再敲 */
+        S.nagAt = now; buzzer(1.2);                      /* 超時提醒，短版 */
+      }
+      if (tRemain <= 0 && !S.totalRung){          /* 總時長到 */
+        S.totalRung = true; alarm();
+      }
+    }
+
+    /* 時間到的視覺告示（靜音時也看得到） */
+    var tu = el("timeup");
+    if (!S.done && sRemain <= 0){
+      tu.dataset.on = "1";
+      el("timeupAmt").textContent = "+" + fmt(-sRemain);
+    } else {
+      tu.dataset.on = "0";
+    }
+
+    /* roster：同樣是血條，剩下的才是你的餘裕 */
+    for (var k=0;k<STAGES.length;k++){
+      var fill = el("rf"+k); if (!fill) continue;
+      var used = (k===S.idx) ? se : S.accStage[k];
+      var left = T[k] - used;
+      fill.style.transform = "scaleX("+Math.max(0, Math.min(1, left/T[k]))+")";
+      fill.parentElement.dataset.state = (k===S.idx) ? stateFor(left, T[k]) : (left < 0 ? "over" : "ok");
+    }
+    requestAnimationFrame(render);
+  }
+
+  /* ── stage transitions ── */
+  function paintStage(){
+    var i = Math.min(S.idx, STAGES.length-1), s = STAGES[i], T = targets();
+    el("stageIdx").textContent = "段落 " + (i+1) + " / " + STAGES.length;
+    el("stageName").textContent = s.key;
+    el("stageSlides").textContent = s.slides;
+    var chips = s.cues.map(function(c){
+      return '<span class="cue"><b>'+c[0]+'</b> · '+c[1]+'</span>';
+    });
+    if (s.cut){
+      chips.push('<span class="cue cue--cut"><b>落後時</b> · '+s.cut+'</span>');
+    }
+    el("cues").innerHTML = chips.join("");
+    S.ghostStage = 1;
+    document.querySelectorAll(".row").forEach(function(r,k){
+      r.dataset.live = (k===i && !S.done) ? "1" : "0";
+      r.dataset.done = (k < i) ? "1" : "0";
+    });
+  }
+
+  function lockRow(i){
+    var T = targets(), used = S.accStage[i], d = used - T[i];
+    var node = el("rr"+i);
+    node.textContent = fmt(used) + "  " + signed(d);
+    node.dataset.sign = Math.abs(d) < 1.5 ? "even" : (d < 0 ? "ahead" : "behind");
+  }
+
+  function fold(){
+    if (S.running){
+      S.accStage[S.idx] += (performance.now() - S.spanStart)/1000;
+      S.spanStart = performance.now();
+    }
+  }
+
+  function start(){
+    if (S.done) return;
+    S.running = true; S.spanStart = performance.now();
+    el("go").textContent = "暫停"; el("go").classList.remove("btn--go");
+    el("next").disabled = false;
+    blip(523, .09);
+  }
+  function pause(){
+    stopAll(); fold(); S.running = false;
+    el("go").textContent = "繼續"; el("go").classList.add("btn--go");
+  }
+  function toggle(){ if (S.done) return; S.running ? pause() : start(); }
+
+  function nextStage(){
+    if (S.done) return;
+    if (!S.running && S.accStage[S.idx] === 0) return;   /* 還沒開始，不給跳 */
+    stopAll(); fold(); lockRow(S.idx);
+    if (S.idx >= STAGES.length - 1){ finish(); return; }
+    S.idx++; S.spanStart = performance.now();
+    paintStage();
+    blip(784, .10);
+  }
+
+  function finish(){
+    fold(); S.running = false; S.done = true;
+    el("go").disabled = true; el("next").disabled = true;
+    el("console").dataset.alarm = "";
+    document.querySelectorAll(".row").forEach(function(r){ r.dataset.live="0"; r.dataset.done="1"; });
+
+    var T = targets(), tot = totalTarget(), used = 0, worst = -1, worstD = 0;
+    for (var i=0;i<STAGES.length;i++){
+      used += S.accStage[i];
+      var d = S.accStage[i] - T[i];
+      if (d > worstD){ worstD = d; worst = i; }
+    }
+    var d = used - tot;
+    el("cardTotal").textContent = fmt(used);
+    el("cardDelta").textContent = "目標 " + fmt(tot) + " · " + signed(d);
+    var ok = d <= 0;
+    el("cardVerdict").textContent = ok ? "達標" : "超時";
+    el("cardVerdict").dataset.v = ok ? "pass" : "fail";
+    var note = ok
+      ? "總長守住了。"
+      : "總長超出 " + fmt(d) + "。";
+    if (worst >= 0) note += " 最需要壓縮的是 <em>" + STAGES[worst].key + "</em>（超 " + fmt(worstD) + "），先從那一段的 🟡／⚪ 張下手。";
+    else note += " 五段都在目標內 —— 這一輪可以直接拿去正式場。";
+    el("cardNote").innerHTML = note;
+    el("card").dataset.show = "1";
+    if (ok) buzzer(2.2); else alarm();
+  }
+
+  function reset(){
+    stopAll();
+    S.running = false; S.done = false; S.idx = 0;
+    S.accStage = new Array(STAGES.length).fill(0);
+    S.fired = new Array(STAGES.length).fill(0);
+    S.nagAt = 0; S.totalRung = false;
+    S.ghostStage = 1; S.ghostTotal = 1;
+    el("timeup").dataset.on = "0";
+    el("go").disabled = false; el("go").textContent = "開始"; el("go").classList.add("btn--go");
+    el("next").disabled = true;
+    el("card").dataset.show = "0";
+    el("console").dataset.alarm = "";
+    buildRoster(); buildMarks(); paintStage();
+  }
+
+  /* ── wiring ── */
+  el("go").addEventListener("click", toggle);
+  el("next").addEventListener("click", nextStage);
+  el("reset").addEventListener("click", reset);
+  el("mute").addEventListener("click", function(){
+    S.muted = !S.muted;
+    if (S.muted) stopAll();
+    this.setAttribute("aria-pressed", S.muted);
+    this.textContent = S.muted ? "♪ 音效 關" : "♪ 音效 開";
+  });
+
+  document.addEventListener("keydown", function(e){
+    if (e.target.tagName === "BUTTON" && e.code === "Space") { e.preventDefault(); }
+    if (e.code === "Space"){ e.preventDefault(); S.running ? nextStage() : toggle(); return; }
+    var k = e.key.toLowerCase();
+    if (k === "s"){ e.preventDefault(); toggle(); }
+    if (k === "r"){ e.preventDefault(); reset(); }
+    if (k === "m"){ e.preventDefault(); el("mute").click(); }
+  });
+
+  reset();
+  requestAnimationFrame(render);
+})();
+</script>
+
+<script>
+(function(){
+  /* 這道門只擋「隨手點開」，擋不住看原始碼的人。
+     真正的保護是這個網址猜不到 + noindex。 */
+  var CODE = "pjyaay";
+  var g = document.getElementById("gate");
+  function open_(){ g.remove(); try{ sessionStorage.setItem("pace_ok","1"); }catch(e){} }
+  try{ if (sessionStorage.getItem("pace_ok") === "1") open_(); }catch(e){}
+  var f = document.getElementById("gf");
+  if (f) f.addEventListener("submit", function(e){
+    e.preventDefault();
+    if (document.getElementById("pw").value.trim().toLowerCase() === CODE) open_();
+    else { document.getElementById("gm").textContent = "通行碼不對"; document.getElementById("pw").value = ""; }
+  });
+  var pw = document.getElementById("pw"); if (pw) pw.focus();
+})();
+</script>
+</body>
+</html>
